@@ -25,12 +25,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: npm
 
-      # npm ci can skip Rollup's Linux optional binaries when package-lock.json
-      # was generated on Windows (npm optional-deps bug). npm install fixes CI.
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install
+          # Lockfiles from Windows often omit installing @rollup/rollup-linux-x64-gnu
+          # on Linux (npm optional-deps bug). Install the binding that matches Rollup.
+          ROLLUP_VER=$(node -p "require(require.resolve('rollup/package.json')).version")
+          npm install "@rollup/rollup-linux-x64-gnu@${ROLLUP_VER}" --no-save
 
       - name: Build
         env:
