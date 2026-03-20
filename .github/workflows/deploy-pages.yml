@@ -26,22 +26,16 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Install dependencies
-        run: |
-          npm install
-          # Windows lockfiles often skip Linux optional native modules (npm bug).
-          # Force platform bindings so Vite (Rollup) and Tailwind (lightningcss) work on ubuntu.
-          ROLLUP_VER=$(node -p "require(require.resolve('rollup/package.json')).version")
-          npm install "@rollup/rollup-linux-x64-gnu@${ROLLUP_VER}" --no-save
-          # lightningcss does not export ./package.json — read version from disk
-          LIGHTNING_VER=$(node -e "const p=require('path'),fs=require('fs');let d=p.dirname(require.resolve('lightningcss'));for(let i=0;i<8;i++){const x=p.join(d,'package.json');if(fs.existsSync(x)){const j=JSON.parse(fs.readFileSync(x,'utf8'));if(j.name==='lightningcss'){console.log(j.version);process.exit(0);}}d=p.dirname(d);}process.exit(1)")
-          npm install "lightningcss-linux-x64-gnu@${LIGHTNING_VER}" --no-save
-
-      - name: Build
+      # package-lock.json from Windows often breaks Rollup/Lightning native optional
+      # deps on Linux (npm bug). Fresh install on Ubuntu always gets correct binaries.
+      - name: Install & build
         env:
-          # Project Pages URL: https://<user>.github.io/<repo>/
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
-        run: npm run build
+        run: |
+          rm -rf node_modules
+          rm -f package-lock.json
+          npm install
+          npm run build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
