@@ -33,7 +33,8 @@ jobs:
           # Force platform bindings so Vite (Rollup) and Tailwind (lightningcss) work on ubuntu.
           ROLLUP_VER=$(node -p "require(require.resolve('rollup/package.json')).version")
           npm install "@rollup/rollup-linux-x64-gnu@${ROLLUP_VER}" --no-save
-          LIGHTNING_VER=$(node -p "require(require.resolve('lightningcss/package.json')).version")
+          # lightningcss does not export ./package.json — read version from disk
+          LIGHTNING_VER=$(node -e "const p=require('path'),fs=require('fs');let d=p.dirname(require.resolve('lightningcss'));for(let i=0;i<8;i++){const x=p.join(d,'package.json');if(fs.existsSync(x)){const j=JSON.parse(fs.readFileSync(x,'utf8'));if(j.name==='lightningcss'){console.log(j.version);process.exit(0);}}d=p.dirname(d);}process.exit(1)")
           npm install "lightningcss-linux-x64-gnu@${LIGHTNING_VER}" --no-save
 
       - name: Build
