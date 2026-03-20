@@ -29,10 +29,12 @@ jobs:
       - name: Install dependencies
         run: |
           npm install
-          # Lockfiles from Windows often omit installing @rollup/rollup-linux-x64-gnu
-          # on Linux (npm optional-deps bug). Install the binding that matches Rollup.
+          # Windows lockfiles often skip Linux optional native modules (npm bug).
+          # Force platform bindings so Vite (Rollup) and Tailwind (lightningcss) work on ubuntu.
           ROLLUP_VER=$(node -p "require(require.resolve('rollup/package.json')).version")
           npm install "@rollup/rollup-linux-x64-gnu@${ROLLUP_VER}" --no-save
+          LIGHTNING_VER=$(node -p "require(require.resolve('lightningcss/package.json')).version")
+          npm install "lightningcss-linux-x64-gnu@${LIGHTNING_VER}" --no-save
 
       - name: Build
         env:
