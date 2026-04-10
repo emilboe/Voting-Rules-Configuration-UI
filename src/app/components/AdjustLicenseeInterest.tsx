@@ -78,7 +78,7 @@ export function AdjustLicenseeInterest() {
       </div>
 
       <p className="text-xs text-gray-500 mb-4">
-        Last updated 9 Apr 2026 by Ole Martin Grønnestad (Tieto AS)
+        Last updated 9 Apr 2026 by Martin Ole Rødested (Nietre AS)
       </p>
 
       <div className="flex-1 min-h-0">
