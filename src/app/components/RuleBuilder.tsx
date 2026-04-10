@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useRef, useState } from "react";
 import { GripVertical, Plus, X, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import {
@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "./ui/select";
 import { Input } from "./ui/input";
+import { VotingRulesTabs } from "./VotingRulesTabs";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
@@ -73,7 +74,7 @@ const ITEM_TYPE = "RULE_ITEM";
 
 type DragItem = { index: number; id: string; groupId: string };
 
-interface DraggableItemProps {
+type DraggableItemProps = React.PropsWithChildren<{
   id: string;
   index: number;
   groupId: string;
@@ -82,8 +83,7 @@ interface DraggableItemProps {
     dragIndex: number,
     hoverIndex: number,
   ) => void;
-  children: React.ReactNode;
-}
+}>;
 
 function DraggableItem({
   id,
@@ -174,6 +174,12 @@ function DraggableItem({
       {children}
     </div>
   );
+}
+
+function truncateRulesetSummary(text: string, maxLen: number): string {
+  const t = text.replace(/\s+/g, " ").trim();
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, Math.max(0, maxLen - 1))}…`;
 }
 
 export function RuleBuilder() {
@@ -540,6 +546,21 @@ export function RuleBuilder() {
     setRootGroup(reorderInGroup(rootGroup));
   };
 
+  const handleSaveRules = () => {
+    setRulesetGroups((prev) =>
+      prev.map((g) =>
+        g.id === selectedRulesetId ? { ...g, rules: rootGroup } : g,
+      ),
+    );
+  };
+
+  const handleDiscardEdits = () => {
+    const saved = rulesetGroups.find((g) => g.id === selectedRulesetId);
+    if (saved) {
+      setRootGroup(structuredClone(saved.rules));
+    }
+  };
+
   const findParentGroup = (
     targetGroupId: string,
     currentGroup: RuleGroup = rootGroup,
@@ -571,8 +592,8 @@ export function RuleBuilder() {
       condition.field === "exclude_company";
 
     return (
+      <div key={condition.id} className="contents">
       <DraggableItem
-        key={condition.id}
         id={condition.id}
         index={index}
         groupId={groupId}
@@ -732,6 +753,7 @@ export function RuleBuilder() {
           </div>
         </div>
       </DraggableItem>
+      </div>
     );
   };
 
@@ -852,40 +874,77 @@ export function RuleBuilder() {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="max-w-7xl mx-auto p-4">
-        {/* Header */}
-        <div className="mb-4">
-          <h1 className="text-2xl mb-1">
-            Voting Rules Configuration
-          </h1>
-          <p className="text-sm text-gray-600">
-            Define who can vote based on their attributes. Rules
-            are evaluated from top to bottom.
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        <div className="mb-8 w-full">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <h1 className="min-w-0 max-w-3xl text-2xl font-bold text-gray-900">
+              Voting Rules Configuration
+            </h1>
+            <VotingRulesTabs className="shrink-0" />
+          </div>
+          <p className="max-w-3xl text-sm text-gray-600">
+            Define who can vote based on their attributes. Rules are evaluated
+            from top to bottom.
           </p>
         </div>
 
         {/* Two Column Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-4 mb-4">
+        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-4">
           {/* Left Column - Ruleset Management */}
-          <div className="space-y-3">
+          <div className="flex flex-col">
+            <div className="space-y-3">
             {/* Ruleset Selector */}
             <div className="bg-white rounded-lg border border-gray-200 p-3">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Select Ruleset
+                Ruleset
               </label>
               <Select
                 value={selectedRulesetId}
                 onValueChange={handleRulesetChange}
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select ruleset" />
+                <SelectTrigger className="w-full h-auto min-h-0 items-start justify-between gap-2 border-gray-200 bg-white px-3 py-3 text-left whitespace-normal hover:bg-gray-50 data-[size=default]:h-auto dark:border-input dark:bg-input/30 dark:hover:bg-input/50 [&_[data-slot=select-value]]:line-clamp-none [&_[data-slot=select-value]]:min-w-0 [&_[data-slot=select-value]]:w-full [&_[data-slot=select-value]]:items-start">
+                  <SelectValue placeholder="Select a ruleset">
+                    <span className="flex min-w-0 flex-1 flex-col items-start gap-1 text-left">
+                      <span className="font-semibold leading-snug text-gray-900">
+                        {selectedRuleset.name}
+                      </span>
+                      <span className="text-xs font-normal leading-normal text-gray-500">
+                        Context: {selectedRuleset.context}
+                      </span>
+                    </span>
+                  </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
-                  {rulesetGroups.map((ruleset) => (
-                    <SelectItem key={ruleset.id} value={ruleset.id}>
-                      {ruleset.name} — {ruleset.context}
-                    </SelectItem>
-                  ))}
+                <SelectContent className="max-h-[min(24rem,70vh)] w-[var(--radix-select-trigger-width)] min-w-[min(100vw-2rem,26rem)] sm:min-w-[26rem]">
+                  {rulesetGroups.map((ruleset) => {
+                    const summary = truncateRulesetSummary(
+                      generateRuleDescription(ruleset.rules),
+                      160,
+                    );
+                    const textValue = `${ruleset.name} ${ruleset.context} ${summary}`;
+                    return (
+                      <SelectItem
+                        key={ruleset.id}
+                        value={ruleset.id}
+                        textValue={textValue}
+                        className="cursor-pointer items-start border-b border-gray-200 py-3 pl-2 pr-8 last:border-b-0"
+                      >
+                        <div className="flex flex-col gap-1.5 text-left">
+                          <span className="font-semibold text-sm text-gray-900 leading-snug">
+                            {ruleset.name}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            Context:{" "}
+                            <span className="text-gray-700">
+                              {ruleset.context}
+                            </span>
+                          </span>
+                          <span className="text-xs text-gray-600 leading-relaxed line-clamp-3 border-t border-gray-100 pt-1.5 mt-0.5">
+                            {summary}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -898,36 +957,6 @@ export function RuleBuilder() {
               <pre className="text-sm text-blue-800 leading-relaxed whitespace-pre-wrap font-sans">
                 {ruleDescription || "No rules defined yet"}
               </pre>
-            </div>
-
-            {/* Create New Ruleset */}
-            <div className="bg-white rounded-lg border border-gray-200 p-3">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">
-                Create New Ruleset
-              </h3>
-              <div className="space-y-2">
-                <Input
-                  type="text"
-                  placeholder="Ruleset name"
-                  className="w-full text-sm"
-                />
-                <Input
-                  type="text"
-                  placeholder="Context (e.g., Procurement)"
-                  className="w-full text-sm"
-                />
-                <Button
-                  size="sm"
-                  className="w-full bg-sky-500 hover:bg-sky-600 text-white"
-                  onClick={() => {
-                    // TODO: Implement create new ruleset
-                    alert("Create new ruleset functionality");
-                  }}
-                >
-                  <Plus className="w-4 h-4 mr-1" />
-                  Create Ruleset
-                </Button>
-              </div>
             </div>
 
             {/* Legend */}
@@ -953,6 +982,37 @@ export function RuleBuilder() {
                 </div>
               </div>
             </div>
+            </div>
+
+            {/* Create New Ruleset — bottom of sidebar */}
+            <div className="mt-18 bg-white rounded-lg border border-gray-200 p-3">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">
+                Create New Ruleset
+              </h3>
+              <div className="space-y-2">
+                <Input
+                  type="text"
+                  placeholder="Ruleset name"
+                  className="w-full text-sm"
+                />
+                <Input
+                  type="text"
+                  placeholder="Context (e.g., Procurement)"
+                  className="w-full text-sm"
+                />
+                <Button
+                  size="sm"
+                  className="w-full bg-blue-500 text-white hover:bg-blue-600"
+                  onClick={() => {
+                    // TODO: Implement create new ruleset
+                    alert("Create new ruleset functionality");
+                  }}
+                >
+                  <Plus className="w-4 h-4 mr-1" />
+                  Create Ruleset
+                </Button>
+              </div>
+            </div>
           </div>
           
 
@@ -962,13 +1022,24 @@ export function RuleBuilder() {
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div className="flex justify-end gap-2">
-          <Button size="sm">Cancel</Button>
-          <Button size="sm" className="bg-sky-500 hover:bg-sky-600 text-white">
-            Save Rules
+        <footer className="flex flex-wrap justify-end gap-2 pt-6 mt-8 border-t border-gray-200">
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            onClick={handleDiscardEdits}
+          >
+            Cancel
           </Button>
-        </div>
+          <Button
+            size="sm"
+            type="button"
+            onClick={handleSaveRules}
+            className="bg-blue-500 text-white hover:bg-blue-600"
+          >
+            Save rules
+          </Button>
+        </footer>
       </div>
     </DndProvider>
   );
